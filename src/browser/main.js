@@ -348,13 +348,65 @@
                 memory_size: 64 * 1024 * 1024,
                 hda: {
                     "url": HOST + "images/windows98.img",
-                    "async": true,
+                    //"async": true,
                     "size": 300 * 1024 * 1024,
                 },
                 name: "Windows 98",
                 state: {
                     "url": HOST + "images/windows98_state.bin",
                     "size": 75705744,
+                },
+            },
+            {
+                id: "windows98bro",
+                memory_size: 512 * 1024 * 1024,
+                vga_memory_size: 32 * 1024 * 1024,
+                hda: {
+                    "url": HOST + "images/windows98bro.img",
+                    "size": 300 * 1024 * 1024,
+                },
+                name: "Its Windows 98 Bro",
+            },
+            {
+                id: "windows98sound",
+                memory_size: 512 * 1024 * 1024,
+                vga_memory_size: 32 * 1024 * 1024,
+                hda: {
+                    "url": HOST + "images/windows98-v86Box.05.config0.img",
+                    "size": 300 * 1024 * 1024,
+                },
+                cdrom: {
+                    "url": HOST + "images/bros24th.iso",
+                    "size": 500 * 1024,
+                },
+                name: "Windows 98 + Sound",
+            },
+            {
+                id: "windows98sound1",
+                memory_size: 512 * 1024 * 1024,
+                vga_memory_size: 32 * 1024 * 1024,
+                hda: {
+                    "url": HOST + "images/states-v4/windows98-v86Box.05.config0.state1.img",
+                    "size": 300 * 1024 * 1024,
+                },
+                name: "Windows 98 + Sound #1",
+                state: {
+                    "url": HOST + "images/states-v4/windows98-v86Box.05.config0.state1.bin",
+                    "size": 570655088,
+                },
+            },
+            {
+                id: "windows98sound2",
+                memory_size: 512 * 1024 * 1024,
+                vga_memory_size: 32 * 1024 * 1024,
+                hda: {
+                    "url": HOST + "images/states-v4/windows98-v86Box.05.config0.state2.img",
+                    "size": 300 * 1024 * 1024,
+                },
+                name: "Windows 98 + Sound #2",
+                state: {
+                    "url": HOST + "images/states-v4/windows98-v86Box.05.config0.state2.bin",
+                    "size": 570655088,
                 },
             },
             {
