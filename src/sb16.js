@@ -22,7 +22,7 @@ var
 /** @const */ DMA_BUFSIZE = 65536,
 
     // Number of samples to attempt to retrieve per transfer.
-/** @const */ DMA_BLOCK_SAMPLES = 512,
+/** @const */ DMA_BLOCK_SAMPLES = 1024,
 
     // Default DMA channels.
 /** @const */ DMA_CHANNEL_8BIT = 1,
@@ -828,6 +828,10 @@ register_dsp_command([0x41, 0x42], 2, function()
 // Set DSP block transfer size.
 register_dsp_command([0x48], 2, function()
 {
+    // TODO: should be in bytes, but if this is only used
+    // for 8 bit transfers, then this number is the same
+    // as number of samples?
+    // Wrong: e.g. stereo requires two bytes per sample.
     this.dma_transfer_size_set();
 });
 
@@ -1213,7 +1217,12 @@ SB16.prototype.dma_transfer_start = function()
 
     this.bytes_per_sample = 1;
     if(this.dsp_16bit) this.bytes_per_sample *= 2;
-    if(this.dsp_stereo) this.bytes_per_sample *= 2;
+
+    // Don't count stereo interleaved bits apparently.
+    // Disabling this line is needed for sounds to work correctly,
+    // especially double buffering autoinit mode.
+    // Learnt the hard way.
+    // if(this.dsp_stereo) this.bytes_per_sample *= 2;
 
     this.dac_rate_ratio = Math.round(this.audio_samplerate / this.sampling_rate);
 
