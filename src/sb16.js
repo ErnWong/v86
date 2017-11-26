@@ -22,7 +22,7 @@ var
 /** @const */ DMA_BUFSIZE = 65536,
 
     // Number of samples to attempt to retrieve per transfer.
-/** @const */ DMA_BLOCK_SAMPLES = 2048,
+/** @const */ DMA_BLOCK_SAMPLES = 512,
 
     // Default DMA channels.
 /** @const */ DMA_CHANNEL_8BIT = 1,
@@ -95,6 +95,9 @@ function SB16(cpu, bus)
     // doing some sort of sample rate conversion, or detuning,
     // as it currently changes the pitch of every audio (slightly sharper).
     this.dac_rate_ratio = 2;
+
+    // Number of samples requested on each audio-process.
+    this.dac_process_samples = DMA_BLOCK_SAMPLES;
 
     // Direct Memory Access transfer info.
     this.dma = cpu.devices.dma;
@@ -463,7 +466,7 @@ SB16.prototype.port2xD_read = function()
 SB16.prototype.port2xE_read = function()
 {
     dbg_log("22E read: read-buffer status / irq 8bit ack.", LOG_SB16);
-    if(this.irq_triggered_8bit)
+    if(this.irq_triggered[SB_IRQ_8BIT])
     {
         this.lower_irq(SB_IRQ_8BIT);
     }
@@ -475,7 +478,6 @@ SB16.prototype.port2xE_read = function()
 SB16.prototype.port2xF_read = function()
 {
     dbg_log("22F read: irq 16bit ack", LOG_SB16);
-    this.irq_triggered_16bit = false;
     this.lower_irq(SB_IRQ_16BIT);
     return 0;
 }
@@ -1239,7 +1241,7 @@ SB16.prototype.dma_transfer_next = function()
     // Don't transfer too much too early, or else the DMA counters will not
     // accurately reflect the amount of audio that has already been
     // played back by the Web Audio API.
-    if(this.dac_buffer.length > DMA_BLOCK_SAMPLES * 2) return;
+    if(this.dac_buffer.length > this.dac_process_samples * 2) return;
 
     dbg_log("dma transfering next block", LOG_SB16);
 
@@ -1306,7 +1308,9 @@ SB16.prototype.audio_process = function(event)
     var out0 = event.outputBuffer.getChannelData(0);
     var out1 = event.outputBuffer.getChannelData(1);
 
-    if(this.dac_buffer.length && this.dac_buffer.length < out.length * 2)
+    this.dac_process_samples = out.length;
+
+    if(this.dac_buffer.length && this.dac_buffer.length < this.dac_process_samples * 2)
     {
         dbg_log("dac_buffer contains only " + Math.floor(100*this.dac_buffer.length/out.length/2) + "% of data needed", LOG_SB16);
     }
@@ -1341,7 +1345,7 @@ function audio_normalize(value, amplitude, offset)
 
 function audio_clip(value, low, high)
 {
-    return (value < low) * low 
+    return (value < low) * low
         +  (value > high) * high
         +  (low <= value && value <= high) * value;
 }
