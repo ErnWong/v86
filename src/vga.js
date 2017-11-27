@@ -88,6 +88,9 @@ function VGAScreen(cpu, bus, vga_memory_size)
     this.graphical_mode_is_linear = true;
 
     /** @type {boolean} */
+    this.graphical_mode_is_custom = false; // TODO: save state
+
+    /** @type {boolean} */
     this.graphical_mode = false;
 
     /*
@@ -464,12 +467,44 @@ VGAScreen.prototype.vga_memory_write = function(addr, value)
 
 VGAScreen.prototype.vga_memory_write_graphical_linear = function(addr, value)
 {
-    addr |= this.svga_bank_offset;
+    if(this.graphical_mode_is_custom)
+    {
+        // Custom high res 320x400 "13h" mode.
+        // (Cheap hack until VGA implementation is generalized)
+        // Here, each pixel is represented by a byte (8bit colour)
+        // and is cycled through each plane.
+        // The nth pixel is on plane (n%4) and address n / 4
+        // See https://en.wikipedia.org/wiki/LOGO.SYS
+        // See http://www.phatcode.net/res/224/files/html/ch31/31-01.html
+        //addr &= 0xFFFF;
+        if(this.plane_write_bm & 1) this.plane0[addr] = value;
+        if(this.plane_write_bm & 2) this.plane1[addr] = value;
+        if(this.plane_write_bm & 4) this.plane2[addr] = value;
+        if(this.plane_write_bm & 8) this.plane3[addr] = value;
 
-    this.diff_addr_min = addr < this.diff_addr_min ? addr : this.diff_addr_min;
-    this.diff_addr_max = addr > this.diff_addr_max ? addr : this.diff_addr_max;
+        // Assuming that this.start_address will either be 0 or 0x8000
+        // (This is a bad assumption)
+        var page_offset = (addr - addr % 0x8000) * 4;
+        addr %= 0x8000;
 
-    this.svga_memory[addr] = value;
+        for(var i = 0; i < 4; i++)
+        {
+            if(!(this.plane_write_bm & (1 << i))) continue;
+            var svga_addr = addr * 4 + i + VGA_PLANAR_REAL_BUFFER_START + page_offset;
+            this.diff_addr_min = svga_addr < this.diff_addr_min ? svga_addr : this.diff_addr_min;
+            this.diff_addr_max = svga_addr > this.diff_addr_max ? svga_addr : this.diff_addr_max;
+            this.svga_memory[svga_addr] = value;
+        }
+    }
+    else
+    {
+        addr |= this.svga_bank_offset;
+
+        this.diff_addr_min = addr < this.diff_addr_min ? addr : this.diff_addr_min;
+        this.diff_addr_max = addr > this.diff_addr_max ? addr : this.diff_addr_max;
+
+        this.svga_memory[addr] = value;
+    }
 };
 
 VGAScreen.prototype.vga_memory_write_graphical_planar = function(addr, value)
@@ -811,6 +846,7 @@ VGAScreen.prototype.set_size_graphical = function(width, height, bpp)
     this.stats.res_y = height;
 
     this.bus.send("screen-set-size-graphical", [width, height, bpp]);
+    this.complete_redraw();
 };
 
 VGAScreen.prototype.update_cursor_scanline = function()
@@ -821,6 +857,8 @@ VGAScreen.prototype.update_cursor_scanline = function()
 VGAScreen.prototype.set_video_mode = function(mode)
 {
     var is_graphical = false;
+
+    this.graphical_mode_is_custom = false;
 
     var width = 0;
     var height = 0;
@@ -846,10 +884,22 @@ VGAScreen.prototype.set_video_mode = function(mode)
             this.graphical_mode_is_linear = false;
             break;
         case 0x13:
-            width = 320;
-            height = 200;
-            is_graphical = true;
-            this.graphical_mode_is_linear = true;
+            if(this.sequencer_memory_mode & 0x8)
+            {
+                width = 320;
+                height = 200;
+                is_graphical = true;
+                this.graphical_mode_is_linear = true;
+            }
+            else
+            {
+                // Highres custom 13h mode
+                width = 320;
+                height = 400;
+                is_graphical = true;
+                this.graphical_mode_is_linear = true;
+                this.graphical_mode_is_custom = true;
+            }
             break;
         default:
     }
@@ -944,6 +994,9 @@ VGAScreen.prototype.port3C5_write = function(value)
         case 0x04:
             dbg_log("sequencer memory mode: " + h(value), LOG_VGA);
             this.sequencer_memory_mode = value;
+
+            // Check for change
+            this.switch_video_mode(this.miscellaneous_output_register);
             break;
         default:
             dbg_log("3C5 / sequencer write " + h(this.sequencer_index) + ": " + h(value), LOG_VGA);
@@ -1416,6 +1469,10 @@ VGAScreen.prototype.screen_fill_buffer = function()
         {
             bpp = 8;
             offset = VGA_PLANAR_REAL_BUFFER_START;
+        }
+        if(this.graphical_mode_is_custom)
+        {
+            offset = VGA_PLANAR_REAL_BUFFER_START + this.start_address * 4;
         }
     }
 
