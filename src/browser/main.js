@@ -216,6 +216,28 @@
 
         var oses = [
             {
+                id: "bro",
+                memory_size: 64 * 1024 * 1024,
+                hda: {
+                    "url": HOST + "images/bro.img",
+                    "size": 300 * 1024 * 1024,
+                },
+                name: "Bro",
+            },
+            {
+                id: "bro-state",
+                memory_size: 64 * 1024 * 1024,
+                state: {
+                    "url": HOST + "images/bro-state.bin",
+                    "size": 75780344,
+                },
+                hda: {
+                    "url": HOST + "images/bro-state.img",
+                    "size": 300 * 1024 * 1024,
+                },
+                name: "Bro State",
+            },
+            {
                 id: "archlinux",
                 state: {
                     "url": HOST + "images/v86state.bin",
