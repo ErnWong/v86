@@ -995,8 +995,11 @@ VGAScreen.prototype.port3C5_write = function(value)
             dbg_log("sequencer memory mode: " + h(value), LOG_VGA);
             this.sequencer_memory_mode = value;
 
-            // Check for change
-            this.switch_video_mode(this.miscellaneous_output_register);
+            // Check for vga mode change
+            if(!this.svga_enabled)
+            {
+                this.switch_video_mode(this.miscellaneous_output_register);
+            }
             break;
         default:
             dbg_log("3C5 / sequencer write " + h(this.sequencer_index) + ": " + h(value), LOG_VGA);
