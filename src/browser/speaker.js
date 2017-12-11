@@ -13,6 +13,11 @@ function SpeakerAdapter(bus)
     {
         return;
     }
+    if(!window.AudioContext && !window.webkitAudioContext)
+    {
+        console.warn("Web browser doesn't support Web Audio API");
+        return;
+    }
 
     /** @const @type {BusConnector} */
     this.bus = bus;
@@ -44,23 +49,28 @@ function SpeakerAdapter(bus)
         this.beep_update();
     }, this);
 
-    bus.register("pcspeaker-update", function(pit)
+    bus.register("pcspeaker-update", function(data)
     {
-        this.pit_enabled = pit.counter_mode[2] == 3;
-        this.beep_frequency = OSCILLATOR_FREQ * 1000 / pit.counter_reload[2];
+        var counter_mode = data[0];
+        var counter_reload = data[1];
+        this.pit_enabled = counter_mode == 3;
+        this.beep_frequency = OSCILLATOR_FREQ * 1000 / counter_reload;
         this.beep_update();
     }, this);
 
-    this.debug_dac = false;
-    this.debug_dac_out = [];
-    window["speaker_debug_dac_out"] = this.debug_dac_out;
-    window["speaker_debug_start"] = () =>
+    if(DEBUG)
     {
-        this.debug_dac = true;
-        setTimeout(() =>
+        this.debug_dac = false;
+        this.debug_dac_out = [];
+        window["speaker_debug_dac_out"] = this.debug_dac_out;
+        window["speaker_debug_start"] = () =>
         {
-            this.debug_dac = false;
-        },250);
+            this.debug_dac = true;
+            setTimeout(() =>
+            {
+                this.debug_dac = false;
+            },250);
+        }
     }
 }
 
@@ -82,14 +92,18 @@ SpeakerAdapter.prototype.beep_update = function()
         this.beep_gain.gain.setValueAtTime(0, current_time);
         this.beep_playing = false;
     }
-}
+};
 
 SpeakerAdapter.prototype.dac_process = function(event)
 {
     this.bus.send("speaker-tell-samplerate", this.audio_context.sampleRate);
     this.bus.send("speaker-process", event);
-    if(this.debug_dac)
+
+    if(DEBUG)
     {
-        this.debug_dac_out.push(event.outputBuffer.getChannelData(0).slice());
+        if(this.debug_dac)
+        {
+            this.debug_dac_out.push(event.outputBuffer.getChannelData(0).slice());
+        }
     }
-}
+};
