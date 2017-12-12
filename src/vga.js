@@ -88,7 +88,7 @@ function VGAScreen(cpu, bus, vga_memory_size)
     this.graphical_mode_is_linear = true;
 
     /** @type {boolean} */
-    this.graphical_mode_is_custom = false; // TODO: save state
+    this.graphical_mode_is_custom = false;
 
     /** @type {boolean} */
     this.graphical_mode = false;
@@ -345,6 +345,9 @@ VGAScreen.prototype.get_state = function()
     state[40] = this.graphical_mode_is_linear;
     state[41] = this.attribute_controller_index;
     state[42] = this.offset_register;
+    state[43] = this.planar_setreset;
+    state[44] = this.planar_setreset_enable;
+    state[45] = this.graphical_mode_is_custom;
 
     return state;
 };
@@ -394,13 +397,32 @@ VGAScreen.prototype.set_state = function(state)
     this.graphical_mode_is_linear = state[40];
     this.attribute_controller_index = state[41];
     this.offset_register = state[42];
+    this.planar_setreset = state[43];
+    this.planar_setreset_enable = state[44];
+    this.graphical_mode_is_custom = state[45];
+
+    this.planar_bitmap_dword = this.apply_feed(this.planar_bitmap);
+    this.planar_setreset_dword = this.apply_expand(this.planar_setreset);
+    this.planar_setreset_enable_dword = this.apply_expand(this.planar_setreset_enable);
+
+    this.latch_dword = 0;
+    this.latch_dword |= this.latch0 << 0;
+    this.latch_dword |= this.latch1 << 8;
+    this.latch_dword |= this.latch2 << 16;
+    this.latch_dword |= this.latch3 << 24;
 
     this.bus.send("screen-set-mode", this.graphical_mode);
 
     if(this.graphical_mode)
     {
-        // TODO: Consider non-svga modes
-        this.set_size_graphical(this.svga_width, this.svga_height, this.svga_bpp);
+        if(this.svga_enabled)
+        {
+            this.set_size_graphical(this.svga_width, this.svga_height, this.svga_bpp);
+        }
+        else
+        {
+            this.switch_video_mode(this.miscellaneous_output_register);
+        }
     }
     else
     {
