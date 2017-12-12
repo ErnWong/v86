@@ -88,7 +88,7 @@ function VGAScreen(cpu, bus, vga_memory_size)
     this.graphical_mode_is_linear = true;
 
     /** @type {boolean} */
-    this.graphical_mode_is_custom = false; // TODO: save state
+    this.graphical_mode_is_custom = false;
 
     /** @type {boolean} */
     this.graphical_mode = false;
@@ -345,6 +345,9 @@ VGAScreen.prototype.get_state = function()
     state[40] = this.graphical_mode_is_linear;
     state[41] = this.attribute_controller_index;
     state[42] = this.offset_register;
+    state[43] = this.planar_setreset;
+    state[44] = this.planar_setreset_enable;
+    state[45] = this.graphical_mode_is_custom;
 
     return state;
 };
@@ -394,13 +397,32 @@ VGAScreen.prototype.set_state = function(state)
     this.graphical_mode_is_linear = state[40];
     this.attribute_controller_index = state[41];
     this.offset_register = state[42];
+    this.planar_setreset = state[43];
+    this.planar_setreset_enable = state[44];
+    this.graphical_mode_is_custom = state[45];
+
+    this.planar_bitmap_dword = this.apply_feed(this.planar_bitmap);
+    this.planar_setreset_dword = this.apply_expand(this.planar_setreset);
+    this.planar_setreset_enable_dword = this.apply_expand(this.planar_setreset_enable);
+
+    this.latch_dword = 0;
+    this.latch_dword |= this.latch0 << 0;
+    this.latch_dword |= this.latch1 << 8;
+    this.latch_dword |= this.latch2 << 16;
+    this.latch_dword |= this.latch3 << 24;
 
     this.bus.send("screen-set-mode", this.graphical_mode);
 
     if(this.graphical_mode)
     {
-        // TODO: Consider non-svga modes
-        this.set_size_graphical(this.svga_width, this.svga_height, this.svga_bpp);
+        if(this.svga_enabled)
+        {
+            this.set_size_graphical(this.svga_width, this.svga_height, this.svga_bpp);
+        }
+        else
+        {
+            this.switch_video_mode(this.miscellaneous_output_register);
+        }
     }
     else
     {
@@ -482,15 +504,13 @@ VGAScreen.prototype.vga_memory_write_graphical_linear = function(addr, value)
         if(this.plane_write_bm & 4) this.plane2[addr] = value;
         if(this.plane_write_bm & 8) this.plane3[addr] = value;
 
-        // Assuming that this.start_address will either be 0 or 0x8000
-        // (This is a bad assumption)
-        var page_offset = (addr - addr % 0x8000) * 4;
-        addr %= 0x8000;
+        // Each address represents 4 pixels.
+        addr <<= 2;
 
         for(var i = 0; i < 4; i++)
         {
             if(!(this.plane_write_bm & (1 << i))) continue;
-            var svga_addr = addr * 4 + i + VGA_PLANAR_REAL_BUFFER_START + page_offset;
+            var svga_addr = addr + i + VGA_PLANAR_REAL_BUFFER_START;
             this.diff_addr_min = svga_addr < this.diff_addr_min ? svga_addr : this.diff_addr_min;
             this.diff_addr_max = svga_addr > this.diff_addr_max ? svga_addr : this.diff_addr_max;
             this.svga_memory[svga_addr] = value;
