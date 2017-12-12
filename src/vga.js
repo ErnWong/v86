@@ -482,15 +482,10 @@ VGAScreen.prototype.vga_memory_write_graphical_linear = function(addr, value)
         if(this.plane_write_bm & 4) this.plane2[addr] = value;
         if(this.plane_write_bm & 8) this.plane3[addr] = value;
 
-        // Assuming that this.start_address will either be 0 or 0x8000
-        // (This is a bad assumption)
-        var page_offset = (addr - addr % 0x8000) * 4;
-        addr %= 0x8000;
-
         for(var i = 0; i < 4; i++)
         {
             if(!(this.plane_write_bm & (1 << i))) continue;
-            var svga_addr = addr * 4 + i + VGA_PLANAR_REAL_BUFFER_START + page_offset;
+            var svga_addr = addr * 4 + i + VGA_PLANAR_REAL_BUFFER_START;
             this.diff_addr_min = svga_addr < this.diff_addr_min ? svga_addr : this.diff_addr_min;
             this.diff_addr_max = svga_addr > this.diff_addr_max ? svga_addr : this.diff_addr_max;
             this.svga_memory[svga_addr] = value;
