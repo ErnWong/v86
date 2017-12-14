@@ -42,6 +42,8 @@ function SpeakerAdapter(bus)
     this.dac_processor = this.audio_context.createScriptProcessor(2048, 0, 2);
     this.dac_processor.onaudioprocess = this.dac_process.bind(this);
     this.dac_processor.connect(this.audio_context.destination);
+    this.dac_buffer0 = new Float32Array(this.dac_processor.bufferSize);
+    this.dac_buffer1 = new Float32Array(this.dac_processor.bufferSize);
 
     bus.register("pcspeaker-enable", function(yesplease)
     {
@@ -57,6 +59,19 @@ function SpeakerAdapter(bus)
         this.beep_frequency = OSCILLATOR_FREQ * 1000 / counter_reload;
         this.beep_update();
     }, this);
+
+    bus.register("speaker-update-data", function(data)
+    {
+        this.dac_buffer0 = data[0];
+        this.dac_buffer1 = data[1];
+    }, this);
+
+    bus.register("speaker-request-samplerate", function()
+    {
+        bus.send("speaker-tell-samplerate", this.audio_context.sampleRate);
+    }, this);
+
+    bus.send("speaker-tell-samplerate", this.audio_context.sampleRate);
 
     if(DEBUG)
     {
@@ -96,8 +111,11 @@ SpeakerAdapter.prototype.beep_update = function()
 
 SpeakerAdapter.prototype.dac_process = function(event)
 {
-    this.bus.send("speaker-tell-samplerate", this.audio_context.sampleRate);
-    this.bus.send("speaker-process", event);
+    var out = event.outputBuffer;
+    out.copyToChannel(this.dac_buffer0, 0);
+    out.copyToChannel(this.dac_buffer1, 1);
+
+    this.bus.send("speaker-request-data", out.length);
 
     if(DEBUG)
     {
