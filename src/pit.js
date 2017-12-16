@@ -138,9 +138,17 @@ PIT.prototype.get_counter_value = function(i, now)
 
     dbg_log("diff=" + diff + " dticks=" + diff_in_ticks + " value=" + value + " reload=" + this.counter_reload[i], LOG_PIT);
 
-    // could be too large after restore_state
     var reload = this.counter_reload[i];
-    value = (value % reload + reload) % reload;
+
+    if(value >= reload)
+    {
+        dbg_log("Warning: Counter" + i + " value " + value  + " is larger than reload " + reload, LOG_PIT);
+        value %= reload;
+    }
+    else if(value < 0)
+    {
+        value = value % reload + reload;
+    }
 
     return value;
 };
@@ -235,10 +243,7 @@ PIT.prototype.counter_write = function(i, value)
         this.counter_next_low[i] ^= 1;
     }
 
-    this.bus.send("pcspeaker-update", [
-        this.counter_mode[2],
-        this.counter_reload[2]
-    ]);
+    this.bus.send("pcspeaker-update", [this.counter_mode[2], this.counter_reload[2]]);
 };
 
 PIT.prototype.port43_write = function(reg_byte)
@@ -315,8 +320,5 @@ PIT.prototype.port43_write = function(reg_byte)
     this.counter_mode[i] = mode;
     this.counter_read_mode[i] = read_mode;
 
-    this.bus.send("pcspeaker-update", [
-        this.counter_mode[2],
-        this.counter_reload[2]
-    ]);
+    this.bus.send("pcspeaker-update", [this.counter_mode[2], this.counter_reload[2]]);
 };
