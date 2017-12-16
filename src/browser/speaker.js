@@ -25,12 +25,12 @@ function SpeakerAdapter(bus)
     this.audio_context = new (window.AudioContext || window.webkitAudioContext)();
 
     this.beep_gain = this.audio_context.createGain();
-    this.beep_gain.gain.value = 0;
+    this.beep_gain.gain.setValueAtTime(0, this.audio_context.currentTime);
     this.beep_gain.connect(this.audio_context.destination);
 
     this.beep_oscillator = this.audio_context.createOscillator();
-    this.beep_oscillator.type = 'square';
-    this.beep_oscillator.frequency.value = 440;
+    this.beep_oscillator.type = "square";
+    this.beep_oscillator.frequency.setValueAtTime(440, this.audio_context.currentTime);
     this.beep_oscillator.connect(this.beep_gain);
     this.beep_oscillator.start();
 
@@ -44,6 +44,7 @@ function SpeakerAdapter(bus)
     this.dac_processor.connect(this.audio_context.destination);
     this.dac_buffer0 = new Float32Array(this.dac_processor.bufferSize);
     this.dac_buffer1 = new Float32Array(this.dac_processor.bufferSize);
+    this.dac_enabled = true;
 
     bus.register("pcspeaker-enable", function(yesplease)
     {
@@ -72,6 +73,20 @@ function SpeakerAdapter(bus)
     }, this);
 
     bus.send("speaker-tell-samplerate", this.audio_context.sampleRate);
+
+    bus.register("speaker-update-enable", function(enabled)
+    {
+        if(this.dac_enabled && !enabled)
+        {
+            this.dac_processor.disconnect(this.audio_context.destination);
+            this.dac_enabled = false;
+        }
+        else if(!this.dac_enabled && enabled)
+        {
+            this.dac_processor.connect(this.audio_context.destination);
+            this.dac_enabled = true;
+        }
+    }, this);
 
     if(DEBUG)
     {
@@ -111,7 +126,13 @@ SpeakerAdapter.prototype.beep_update = function()
 
 SpeakerAdapter.prototype.dac_process = function(event)
 {
+    if(!this.dac_enabled)
+    {
+        return;
+    }
+
     var out = event.outputBuffer;
+
     out.copyToChannel(this.dac_buffer0, 0);
     out.copyToChannel(this.dac_buffer1, 1);
 
