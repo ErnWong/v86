@@ -809,7 +809,6 @@ VGAScreen.prototype.set_size_graphical = function(width, height, bpp)
     this.stats.res_y = height;
 
     this.bus.send("screen-set-size-graphical", [width, height, bpp]);
-    this.complete_redraw();
 };
 
 VGAScreen.prototype.update_cursor_scanline = function()
@@ -820,11 +819,11 @@ VGAScreen.prototype.update_cursor_scanline = function()
 VGAScreen.prototype.set_video_mode = function(mode)
 {
     var is_graphical = false;
+    var is_linear = false;
+    var is_custom = false;
 
-    this.graphical_mode_is_custom = false;
-
-    var width = 0;
-    var height = 0;
+    var width = this.svga_width;
+    var height = this.svga_height;
 
     switch(mode)
     {
@@ -838,13 +837,13 @@ VGAScreen.prototype.set_video_mode = function(mode)
             width = 640;
             height = 350;
             is_graphical = true;
-            this.graphical_mode_is_linear = false;
+            is_linear = false;
             break;
         case 0x12:
             width = 640;
             height = 480;
             is_graphical = true;
-            this.graphical_mode_is_linear = false;
+            is_linear = false;
             break;
         case 0x13:
             if(this.sequencer_memory_mode & 0x8)
@@ -852,7 +851,7 @@ VGAScreen.prototype.set_video_mode = function(mode)
                 width = 320;
                 height = 200;
                 is_graphical = true;
-                this.graphical_mode_is_linear = true;
+                is_linear = true;
             }
             else
             {
@@ -860,8 +859,8 @@ VGAScreen.prototype.set_video_mode = function(mode)
                 width = 320;
                 height = 400;
                 is_graphical = true;
-                this.graphical_mode_is_linear = true;
-                this.graphical_mode_is_custom = true;
+                is_linear = true;
+                is_custom = true;
             }
             break;
         default:
@@ -870,14 +869,32 @@ VGAScreen.prototype.set_video_mode = function(mode)
     this.bus.send("screen-set-mode", is_graphical);
     this.stats.is_graphical = is_graphical;
 
+    var has_changed = is_graphical !== this.graphical_mode ||
+        width !== this.svga_width ||
+        height !== this.svga_height ||
+        is_linear !== this.graphical_mode_is_linear ||
+        is_custom !== this.graphical_mode_is_custom;
+
+    if(!has_changed)
+    {
+        // Windows 98 startup changes sequencer memory mode while drawing,
+        // which in turn triggers set_video_mode into the same mode.
+        // Calling set_size_graphical clears the existing graphics and
+        // would unintentionally render the drawn portions of the screen black.
+        dbg_log("Unchanged video mode: " + h(mode), LOG_VGA);
+        return;
+    }
+
+    this.graphical_mode = is_graphical;
+    this.graphical_mode_is_linear = is_linear;
+    this.graphical_mode_is_custom = is_custom;
+
     if(is_graphical)
     {
         this.svga_width = width;
         this.svga_height = height;
         this.set_size_graphical(width, height, 8);
     }
-
-    this.graphical_mode = is_graphical;
 
     dbg_log("Current video mode: " + h(mode), LOG_VGA);
 };
